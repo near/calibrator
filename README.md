@@ -10,5 +10,7 @@ This utility measures those properties.
 
 Use like this
 
+```bash
   cargo install --git https://github.com/near/calibrator
   calibrator -i 1000000 -c 1000000
+```
