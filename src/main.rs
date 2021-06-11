@@ -92,24 +92,31 @@ fn measure_operation<F1: FnOnce(u64) -> T, F2: FnOnce(u64, T) -> i64, F3: FnOnce
     result
 }
 
-
 fn main() {
+    use structopt::StructOpt;
+    #[derive(StructOpt)]
+    struct Cli {
+        #[structopt(short = "c", long = "cpu-iterations", default_value = "10000")]
+        num_cpu_iterations: u64,
+        #[structopt(short = "i", long = "io-size", default_value = "100000")]
+        io_size: u64
+    }
+    let args = Cli::from_args();
+
     #[cfg(debug_assertions)]
     println!("WARNING: calibrator must run in release mode to provide accurate results!");
-    const CPU_REPEATS: u64 = 10000;
-    let cpu = measure_operation(CPU_REPEATS, |_| (), measure_cpu, |()| ());
-    println!("CPU executes SHA256 in {} ns", (cpu as u64) / CPU_REPEATS);
-    const IO_SIZE: u64 = 1 * 1000 * 1000;
-    let io_write_seq = measure_operation(IO_SIZE,
+    let cpu = measure_operation(args.num_cpu_iterations, |_| (), measure_cpu, |()| ());
+    println!("CPU executes SHA256 in {} ns", (cpu as u64) / args.num_cpu_iterations);
+    let io_write_seq = measure_operation(args.io_size,
                                      create_file, measure_io_write_seq, cleanup_file);
-    println!("IO sequential write {} ns per byte", (io_write_seq as u64) / IO_SIZE);
-    let io_write_random = measure_operation(IO_SIZE,
+    println!("IO sequential write {} ns per byte", (io_write_seq as u64) / args.io_size);
+    let io_write_random = measure_operation(args.io_size,
                                          create_file, measure_io_write_random, cleanup_file);
-    println!("IO random write {} ns per byte", (io_write_random as u64)/ IO_SIZE);
-    let io_read_seq = measure_operation(IO_SIZE,
+    println!("IO random write {} ns per byte", (io_write_random as u64)/ args.io_size);
+    let io_read_seq = measure_operation(args.io_size,
                                      create_file_and_write, measure_io_read_seq, cleanup_file);
-    println!("IO sequential read {} ns per byte", (io_read_seq as u64) / IO_SIZE);
-    let io_read_random = measure_operation(IO_SIZE,
+    println!("IO sequential read {} ns per byte", (io_read_seq as u64) / args.io_size);
+    let io_read_random = measure_operation(args.io_size,
                                          create_file_and_write, measure_io_read_random, cleanup_file);
-    println!("IO random read {} ns per byte", (io_read_random as u64) / IO_SIZE);
+    println!("IO random read {} ns per byte", (io_read_random as u64) / args.io_size);
 }

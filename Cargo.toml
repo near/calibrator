@@ -8,3 +8,4 @@ edition = "2018"
 [dependencies]
 sha256 = "1.0.2"
 rand = "0.8.3"
+structopt = "0.3.21"
