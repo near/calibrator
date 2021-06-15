@@ -1,9 +1,9 @@
+use itertools::Itertools;
 use rand::Rng;
 use std::collections::HashMap;
 use std::fs::{remove_file, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::time::Instant;
-use itertools::Itertools;
 
 fn measure_cpu(count: u64, _: ()) -> i64 {
     use sha256::digest;
@@ -110,32 +110,69 @@ fn measure_operation<
     result
 }
 
-fn output_stdout(output_data: &HashMap<(String, String, u64), u128>) {
-    use itertools::Itertools;
-    //for (key, value) in output_data {
+fn output_stdout(kind: String, output_data: &HashMap<(String, u64), u128>) {
     for (key, value) in output_data.iter().sorted() {
-        println!("{} {} ns per {}", key.0, value / (key.2 as u128), key.1)
+        println!(
+            "{}: scale {}: {} ns per {}",
+            kind,
+            key.1,
+            value / (key.1 as u128),
+            key.0,
+        )
     }
 }
 
-fn finish_output(out: String, output_data: &HashMap<(String, String, u64), u128>) {
-    let dest: Vec<&str> = out.split(':').collect();
+fn output_gnuplot(file: String, kind: String, output_data: &HashMap<(String, u64), u128>) {
+    let mut file = File::create(format!("{}_{}", kind, file)).unwrap();
+    let mut data = HashMap::<u64, Vec<(u128, String)>>::new();
+    for (key, value) in output_data.iter().sorted() {
+        let v = data.entry(key.1).or_insert_with(|| Vec::new());
+        v.push((*value, key.clone().0));
+    }
+    let mut index = 0;
+    for (key, value) in data {
+        //println!("{} {:?}", key, value);
+        if index == 0 {
+            for (_, comment) in value.clone() {
+                write!(file, "\"{}\" ", comment).unwrap();
+            }
+            write!(file, "\n").unwrap();
+        }
+        index += 1;
+        write!(
+            file,
+            "{} {}\n",
+            key,
+            value
+                .iter()
+                .map(|(y, _comment)| y.to_string())
+                .collect::<Vec<String>>()
+                .join(" ")
+        )
+        .unwrap();
+    }
+}
+
+fn finish_output(out: String, output_data: &HashMap<(String, u64), u128>, kind: String) {
+    let dest = out.split(':').collect::<Vec<&str>>();
     match dest[0] {
-        //"gnuplot" => output_gnuplot(dest[1], key.0, value),
-        "stdout" => output_stdout(output_data),
+        "gnuplot" => output_gnuplot(dest[1].to_string(), kind, output_data),
+        "stdout" => output_stdout(kind, output_data),
         _ => panic!("Unknown output: {}", out),
     }
 }
 
-fn output(
-    kind: String,
-    unit: String,
-    count: u64,
-    value: u128,
-    output_data: &mut HashMap<(String, String, u64), u128>,
-) {
-    let key = (kind, unit, count);
+fn output(kind: String, count: u64, value: u128, output_data: &mut HashMap<(String, u64), u128>) {
+    let key = (kind, count);
     output_data.insert(key, value);
+}
+
+fn parse_seq_or(arg: String, default: u64) -> Vec<u64> {
+    if arg.is_empty() {
+        vec![default]
+    } else {
+        arg.split(',').map(|x| x.parse::<u64>().unwrap()).collect()
+    }
 }
 
 fn main() {
@@ -148,73 +185,65 @@ fn main() {
         io_size: u64,
         #[structopt(short = "o", long = "output", default_value = "stdout")]
         output: String,
-        //#[structopt(short = "r", long = "ranges", default_value = "")]
-        //ranges: String,
+        #[structopt(long = "cpu-range", default_value = "")]
+        cpu_range: String,
+        #[structopt(long = "io-range", default_value = "")]
+        io_range: String,
     }
     let args = Cli::from_args();
-    let mut output_data: HashMap<(String, String, u64), u128> = HashMap::new();
+    let mut output_data_io: HashMap<(String, u64), u128> = HashMap::new();
+    let mut output_data_cpu: HashMap<(String, u64), u128> = HashMap::new();
 
     #[cfg(debug_assertions)]
     println!("WARNING: calibrator must run in release mode to provide accurate results!");
-    let cpu = measure_operation(args.num_cpu_iterations, |_| (), measure_cpu, |()| ());
-    output(
-        "SHA256".to_string(),
-        "op".to_string(),
-        args.num_cpu_iterations,
-        cpu,
-        &mut output_data,
-    );
-    let io_write_seq = measure_operation(
-        args.io_size,
-        create_file,
-        measure_io_write_seq,
-        cleanup_file,
-    );
-    output(
-        "IO sequential write".to_string(),
-        "byte".to_string(),
-        args.num_cpu_iterations,
-        io_write_seq,
-        &mut output_data,
-    );
-    let io_write_random = measure_operation(
-        args.io_size,
-        create_file,
-        measure_io_write_random,
-        cleanup_file,
-    );
-    output(
-        "IO random write".to_string(),
-        "byte".to_string(),
-        args.io_size,
-        io_write_random,
-        &mut output_data,
-    );
-    let io_read_seq = measure_operation(
-        args.io_size,
-        create_file_and_write,
-        measure_io_read_seq,
-        cleanup_file,
-    );
-    output(
-        "IO sequential read".to_string(),
-        "byte".to_string(),
-        args.io_size,
-        io_read_seq,
-        &mut output_data,
-    );
-    let io_read_random = measure_operation(
-        args.io_size,
-        create_file_and_write,
-        measure_io_read_random,
-        cleanup_file,
-    );
-    output(
-        "IO random read".to_string(),
-        "byte".to_string(),
-        args.io_size,
-        io_read_random,
-        &mut output_data,
-    );
-    finish_output(args.output, &output_data);
+    let cpu_range = parse_seq_or(args.cpu_range, args.num_cpu_iterations);
+    for count in cpu_range {
+        let cpu = measure_operation(count, |_| (), measure_cpu, |()| ());
+        output("SHA256".to_string(), count, cpu, &mut output_data_cpu);
+    }
+    let io_range = parse_seq_or(args.io_range, args.io_size);
+    for count in io_range {
+        let io_write_seq =
+            measure_operation(count, create_file, measure_io_write_seq, cleanup_file);
+        output(
+            "IO sequential write".to_string(),
+            count,
+            io_write_seq,
+            &mut output_data_io,
+        );
+        let io_write_random =
+            measure_operation(count, create_file, measure_io_write_random, cleanup_file);
+        output(
+            "IO random write".to_string(),
+            count,
+            io_write_random,
+            &mut output_data_io,
+        );
+        let io_read_seq = measure_operation(
+            count,
+            create_file_and_write,
+            measure_io_read_seq,
+            cleanup_file,
+        );
+        output(
+            "IO sequential read".to_string(),
+            count,
+            io_read_seq,
+            &mut output_data_io,
+        );
+        let io_read_random = measure_operation(
+            count,
+            create_file_and_write,
+            measure_io_read_random,
+            cleanup_file,
+        );
+        output(
+            "IO random read".to_string(),
+            count,
+            io_read_random,
+            &mut output_data_io,
+        );
+    }
+    finish_output(args.output.clone(), &output_data_cpu, "cpu".to_string());
+    finish_output(args.output, &output_data_io, "io".to_string());
 }

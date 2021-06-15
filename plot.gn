@@ -1,11 +1,10 @@
 # Set the output file type
-set terminal postscript eps enhanced color solid colortext 9
+set terminal png
 # Set the output file name
-set output 'perf.pdf'
+set output 'perf.png'
 
 # Now plot the data with lines and points
-plot 'data.txt' \
-     '' using 1:2 w lp title 'read seq', \
-     '' using 1:3 w lp title 'read random', \
-     '' using 1:4 w lp title 'write seq' \
-     '' using 1:5 w lp title 'write random'
+plot 'io_data.txt' using 1:2 w lp title 'random read', \
+     '' using 1:3 w lp title 'random write', \
+     '' using 1:4 w lp title 'seq read', \
+     '' using 1:5 w lp title 'seq write'
