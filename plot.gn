@@ -1,10 +1,10 @@
 # Set the output file type
-set terminal png
+set terminal png size 1600,800
 # Set the output file name
 set output 'perf.png'
 
 # Now plot the data with lines and points
-plot 'io_data.txt' using 1:2 w lp title 'random read', \
-     '' using 1:3 w lp title 'random write', \
-     '' using 1:4 w lp title 'seq read', \
-     '' using 1:5 w lp title 'seq write'
+plot 'io_data.txt' using "count":"IO sequential read" with lp title 'seq read', \
+     '' using "count":"IO random read"  with lp title 'random write', \
+     '' using "count":"IO sequential write" with lp title 'seq write', \
+     '' using "count":"IO random write" with lp title 'seq write'

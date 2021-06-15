@@ -133,6 +133,7 @@ fn output_gnuplot(file: String, kind: String, output_data: &HashMap<(String, u64
     for (key, value) in data {
         //println!("{} {:?}", key, value);
         if index == 0 {
+            write!(file, "\"count\" ").unwrap();
             for (_, comment) in value.clone() {
                 write!(file, "\"{}\" ", comment).unwrap();
             }
@@ -189,6 +190,9 @@ fn main() {
         cpu_range: String,
         #[structopt(long = "io-range", default_value = "")]
         io_range: String,
+        #[structopt(short = "v", long = "verbose")]
+        verbose: bool,
+
     }
     let args = Cli::from_args();
     let mut output_data_io: HashMap<(String, u64), u128> = HashMap::new();
@@ -198,11 +202,17 @@ fn main() {
     println!("WARNING: calibrator must run in release mode to provide accurate results!");
     let cpu_range = parse_seq_or(args.cpu_range, args.num_cpu_iterations);
     for count in cpu_range {
+        if args.verbose {
+            println!("Measuring CPU: {} count...", count);
+        }
         let cpu = measure_operation(count, |_| (), measure_cpu, |()| ());
         output("SHA256".to_string(), count, cpu, &mut output_data_cpu);
     }
     let io_range = parse_seq_or(args.io_range, args.io_size);
     for count in io_range {
+        if args.verbose {
+            println!("Measuring IO: {} count...", count);
+        }
         let io_write_seq =
             measure_operation(count, create_file, measure_io_write_seq, cleanup_file);
         output(
