@@ -36,7 +36,7 @@ To measure with wider ranges on input sizes use smth like
   --cpu-range \
 1000,\
 10000,\
-100000,\
+100000\
   --output 'gnuplot:data.txt'
 ```
 
