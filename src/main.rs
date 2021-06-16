@@ -175,6 +175,60 @@ fn parse_seq_or(arg: String, default: u64) -> Vec<u64> {
     }
 }
 
+fn estimate() {
+    const IO_COUNT: u64 = 100_000;
+    const CPU_COUNT: u64 = 100_000;
+
+    // TODO: tune the values basing on stats.
+    const MIN_IO_READ: u64 = 1000;
+    const MIN_IO_WRITE: u64 = 1000;
+    const MIN_CPU: u64 = 1000;
+
+    let io_write_random = measure_operation(
+        IO_COUNT,
+        create_file,
+        measure_io_write_random,
+        cleanup_file,
+    );
+
+    let write_per_byte = (io_write_random / (IO_COUNT as u128))  as u64;
+
+    let io_read_random = measure_operation(
+        IO_COUNT,
+        create_file_and_write,
+        measure_io_read_random,
+        cleanup_file,
+    );
+    let read_per_byte = (io_read_random/ (IO_COUNT as u128))  as u64;
+
+    let cpu = measure_operation(CPU_COUNT, |_| (), measure_cpu, |()| ());
+    let cpu_per_op = (cpu / (CPU_COUNT as u128)) as u64;
+
+    println!("System score is: DISK WRITE {} DISK READ {} CPU {}", write_per_byte, read_per_byte, cpu_per_op);
+    let mut ok = true;
+    if write_per_byte < MIN_IO_WRITE {
+        println!("WARNING: system DISK WRITE performance is below minimal requirements for validators: {} < {}",
+                 write_per_byte, MIN_IO_WRITE);
+        ok = false;
+    }
+    if read_per_byte < MIN_IO_READ {
+        println!("WARNING: system DISK READ performance is below minimal requirements for validators: {} < {}",
+                 read_per_byte, MIN_IO_READ);
+        ok = false;
+    }
+    if cpu_per_op < MIN_CPU {
+        println!("WARNING: system CPU performance is below minimal requirements for validators: {} < {}",
+                 cpu_per_op, MIN_CPU);
+        ok = false;
+    }
+
+    if ok {
+        println!("SYSTEM PERFORMANCE IS OK");
+    } else {
+        println!("ERROR: SYSTEM PERFORMANCE BELOW THRESHOLDS");
+    }
+}
+
 fn main() {
     use structopt::StructOpt;
     #[derive(StructOpt)]
@@ -191,7 +245,8 @@ fn main() {
         io_range: String,
         #[structopt(short = "v", long = "verbose")]
         verbose: bool,
-
+        #[structopt(short = "e", long = "estimate")]
+        estimate: bool,
     }
     let args = Cli::from_args();
     let mut output_data_io: HashMap<(String, u64), u128> = HashMap::new();
@@ -199,6 +254,12 @@ fn main() {
 
     #[cfg(debug_assertions)]
     println!("WARNING: calibrator must run in release mode to provide accurate results!");
+
+    if args.estimate {
+        estimate();
+        return;
+    }
+
     let cpu_range = parse_seq_or(args.cpu_range, args.num_cpu_iterations);
     for count in cpu_range {
         if args.verbose {
