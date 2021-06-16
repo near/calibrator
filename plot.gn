@@ -5,6 +5,6 @@ set output 'perf.png'
 
 # Now plot the data with lines and points
 plot 'io_data.txt' using "count":"IO sequential read" with lp title 'seq read', \
-     '' using "count":"IO random read"  with lp title 'random write', \
+     '' using "count":"IO random read"  with lp title 'random read', \
      '' using "count":"IO sequential write" with lp title 'seq write', \
-     '' using "count":"IO random write" with lp title 'seq write'
+     '' using "count":"IO random write" with lp title 'random write'
