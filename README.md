@@ -32,6 +32,8 @@ To measure with wider ranges on input sizes use smth like
 30000000,\
 40000000,\
 50000000,\
+300000000,\
+600000000,\
 1000000000\
   --cpu-range \
 1000,\
