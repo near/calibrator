@@ -131,7 +131,6 @@ fn output_gnuplot(file: String, kind: String, output_data: &HashMap<(String, u64
     }
     let mut index = 0;
     for (key, value) in data {
-        //println!("{} {:?}", key, value);
         if index == 0 {
             write!(file, "\"count\" ").unwrap();
             for (_, comment) in value.clone() {
